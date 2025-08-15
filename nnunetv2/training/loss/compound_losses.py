@@ -1,5 +1,6 @@
 import torch
 from nnunetv2.training.loss.dice import SoftDiceLoss, MemoryEfficientSoftDiceLoss
+from nnunetv2.training.loss.focal_tversky import SoftFocalTverskyLoss, MemoryEfficientSoftFocalTverskyLoss
 from nnunetv2.training.loss.robust_ce_loss import RobustCrossEntropyLoss, TopKLoss
 from nnunetv2.utilities.helpers import softmax_helper_dim1
 from torch import nn
@@ -103,6 +104,49 @@ class DC_and_BCE_loss(nn.Module):
             ce_loss = self.ce(net_output, target_regions)
         result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
         return result
+
+
+class FocalTversky(nn.Module):
+
+    def __init__(self, soft_focal_tversky_kwargs, weight_dice=1, use_ignore_label: bool = False,
+                 tversky_class=MemoryEfficientSoftFocalTverskyLoss):
+        """
+        DO NOT APPLY NONLINEARITY IN YOUR NETWORK!
+
+        target mut be one hot encoded
+        IMPORTANT: We assume use_ignore_label is located in target[:, -1]!!!
+
+        :param soft_dice_kwargs:
+        :param bce_kwargs:
+        :param aggregate:
+        """
+        super(FocalTversky, self).__init__()
+
+        self.weight_tversky = weight_dice
+        self.use_ignore_label = use_ignore_label
+
+        self.tv = tversky_class(apply_nonlin=torch.sigmoid, **soft_focal_tversky_kwargs)
+
+    def forward(self, net_output: torch.Tensor, target: torch.Tensor):
+        if self.use_ignore_label:
+            # target is one hot encoded here. invert it so that it is True wherever we can compute the loss
+            if target.dtype == torch.bool:
+                mask = ~target[:, -1:]
+            else:
+                mask = (1 - target[:, -1:]).bool()
+            # remove ignore channel now that we have the mask
+            # why did we use clone in the past? Should have documented that...
+            # target_regions = torch.clone(target[:, :-1])
+            target_regions = target[:, :-1]
+        else:
+            target_regions = target
+            mask = None
+
+        tversky_loss = self.tv(net_output, target_regions, loss_mask=mask)
+        target_regions = target_regions.float()
+        result = self.weight_tversky * tversky_loss
+        return result
+
 
 
 class DC_and_topk_loss(nn.Module):
