@@ -106,9 +106,9 @@ class DC_and_BCE_loss(nn.Module):
         return result
 
 
-class FocalTversky(nn.Module):
+class FT_and_BCE(nn.Module):
 
-    def __init__(self, soft_focal_tversky_kwargs, weight_dice=1, use_ignore_label: bool = False,
+    def __init__(self, bce_kwargs, soft_focal_tversky_kwargs, weight_ce=1, weight_dice=1, use_ignore_label: bool = False,
                  tversky_class=MemoryEfficientSoftFocalTverskyLoss):
         """
         DO NOT APPLY NONLINEARITY IN YOUR NETWORK!
@@ -120,11 +120,15 @@ class FocalTversky(nn.Module):
         :param bce_kwargs:
         :param aggregate:
         """
-        super(FocalTversky, self).__init__()
+        super(FT_and_BCE, self).__init__()
+        if use_ignore_label:
+            bce_kwargs['reduction'] = 'none'
 
         self.weight_tversky = weight_dice
+        self.weight_ce = weight_ce
         self.use_ignore_label = use_ignore_label
 
+        self.ce = nn.BCEWithLogitsLoss(**bce_kwargs)
         self.tv = tversky_class(apply_nonlin=torch.sigmoid, **soft_focal_tversky_kwargs)
 
     def forward(self, net_output: torch.Tensor, target: torch.Tensor):
@@ -144,7 +148,12 @@ class FocalTversky(nn.Module):
 
         tversky_loss = self.tv(net_output, target_regions, loss_mask=mask)
         target_regions = target_regions.float()
-        result = self.weight_tversky * tversky_loss
+        if mask is not None:
+            ce_loss = (self.ce(net_output, target_regions) * mask).sum() / torch.clip(mask.sum(), min=1e-8)
+        else:
+            ce_loss = self.ce(net_output, target_regions)
+
+        result = self.weight_ce * ce_loss + self.weight_tversky * tversky_loss
         return result
 
 

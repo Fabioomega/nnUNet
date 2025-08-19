@@ -391,16 +391,16 @@ class nnUNetTrainer(object):
 
     def _build_loss(self):
         if self.label_manager.has_regions:
-            # loss = DC_and_BCE_loss({},
-            #                        {'batch_dice': self.configuration_manager.batch_dice,
-            #                         'do_bg': True, 'smooth': 1e-5, 'ddp': self.is_ddp},
-            #                        use_ignore_label=self.label_manager.ignore_label is not None,
-            #                        dice_class=MemoryEfficientSoftDiceLoss)
-
-            loss = FocalTversky({'batch_dice': self.configuration_manager.batch_dice,
+            loss = DC_and_BCE_loss({},
+                                   {'batch_dice': self.configuration_manager.batch_dice,
                                     'do_bg': True, 'smooth': 1e-5, 'ddp': self.is_ddp},
                                    use_ignore_label=self.label_manager.ignore_label is not None,
-                                   dice_class=MemoryEfficientSoftFocalTverskyLoss)
+                                   dice_class=MemoryEfficientSoftDiceLoss)
+
+            # loss = FocalTversky({'batch_dice': self.configuration_manager.batch_dice,
+            #                         'do_bg': True, 'smooth': 1e-5, 'ddp': self.is_ddp},
+            #                        use_ignore_label=self.label_manager.ignore_label is not None,
+            #                        dice_class=MemoryEfficientSoftFocalTverskyLoss)
         else:
             loss = DC_and_CE_loss({'batch_dice': self.configuration_manager.batch_dice,
                                    'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1,
