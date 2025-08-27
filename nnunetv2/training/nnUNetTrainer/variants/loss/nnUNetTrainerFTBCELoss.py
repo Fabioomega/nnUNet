@@ -22,7 +22,7 @@ class nnUNetTrainerFTBCELoss(nnUNetTrainer):
             )
 
         if self._do_i_compile():
-            loss.dc = torch.compile(loss.dc)
+            loss.tv = torch.compile(loss.tv)
 
         # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
         # this gives higher resolution outputs more weight in the loss
