@@ -41,3 +41,5 @@ class nnUNetTrainerFTBCELoss(nnUNetTrainer):
             weights = weights / weights.sum()
             # now wrap the loss
             loss = DeepSupervisionWrapper(loss, weights)
+        
+        return loss
