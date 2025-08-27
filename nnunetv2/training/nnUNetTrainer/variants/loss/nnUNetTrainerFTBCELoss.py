@@ -18,7 +18,7 @@ class nnUNetTrainerFTBCELoss(nnUNetTrainer):
                     "ddp": self.is_ddp,
                 },
                 use_ignore_label=self.label_manager.ignore_label is not None,
-                dice_class=MemoryEfficientSoftDiceLoss,
+                tversky_class=MemoryEfficientSoftDiceLoss,
             )
 
         if self._do_i_compile():
