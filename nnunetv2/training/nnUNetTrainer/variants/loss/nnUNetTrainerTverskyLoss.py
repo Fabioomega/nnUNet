@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from nnunetv2.training.loss.compound_losses import (
-    FT_and_BCE,
+    FT_and_BCE_loss, FT_and_CE_loss,
     MemoryEfficientSoftFocalTverskyLoss,
 )
 from nnunetv2.training.loss.deep_supervision import DeepSupervisionWrapper
@@ -46,7 +46,7 @@ class nnUNetTrainerTverskyLoss_noSmooth(nnUNetTrainer):
     def _build_loss(self):
         # set smooth to 0
         if self.label_manager.has_regions:
-            loss = FT_and_BCE(
+            loss = FT_and_BCE_loss(
                 {},
                 {
                     "batch_dice": self.configuration_manager.batch_dice,
@@ -58,7 +58,7 @@ class nnUNetTrainerTverskyLoss_noSmooth(nnUNetTrainer):
                 dice_class=MemoryEfficientSoftDiceLoss,
             )
         else:
-            loss = FT_and_BCE(
+            loss = FT_and_CE_loss(
                 {
                     "batch_dice": self.configuration_manager.batch_dice,
                     "smooth": 0,

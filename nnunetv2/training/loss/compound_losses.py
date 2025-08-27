@@ -105,8 +105,59 @@ class DC_and_BCE_loss(nn.Module):
         result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
         return result
 
+class FT_and_CE_loss(nn.Module):
 
-class FT_and_BCE(nn.Module):
+    def __init__(self, ce_kwargs, soft_focal_tversky_kwargs, weight_ce=1, weight_dice=1, use_ignore_label: bool = False,
+                 tversky_class=MemoryEfficientSoftFocalTverskyLoss):
+        """
+        DO NOT APPLY NONLINEARITY IN YOUR NETWORK!
+
+        target mut be one hot encoded
+        IMPORTANT: We assume use_ignore_label is located in target[:, -1]!!!
+
+        :param soft_dice_kwargs:
+        :param bce_kwargs:
+        :param aggregate:
+        """
+        super(FT_and_CE_loss, self).__init__()
+        if use_ignore_label:
+            ce_kwargs['reduction'] = 'none'
+
+        self.weight_tversky = weight_dice
+        self.weight_ce = weight_ce
+        self.use_ignore_label = use_ignore_label
+
+        self.ce = self.ce = RobustCrossEntropyLoss(**ce_kwargs)
+        self.tv = tversky_class(apply_nonlin=torch.sigmoid, **soft_focal_tversky_kwargs)
+
+    def forward(self, net_output: torch.Tensor, target: torch.Tensor):
+        if self.use_ignore_label:
+            # target is one hot encoded here. invert it so that it is True wherever we can compute the loss
+            if target.dtype == torch.bool:
+                mask = ~target[:, -1:]
+            else:
+                mask = (1 - target[:, -1:]).bool()
+            # remove ignore channel now that we have the mask
+            # why did we use clone in the past? Should have documented that...
+            # target_regions = torch.clone(target[:, :-1])
+            target_regions = target[:, :-1]
+        else:
+            target_regions = target
+            mask = None
+
+        tversky_loss = self.tv(net_output, target_regions, loss_mask=mask)
+        target_regions = target_regions.float()
+        if mask is not None:
+            ce_loss = (self.ce(net_output, target_regions) * mask).sum() / torch.clip(mask.sum(), min=1e-8)
+        else:
+            ce_loss = self.ce(net_output, target_regions)
+
+        result = self.weight_ce * ce_loss + self.weight_tversky * tversky_loss
+        return result
+
+
+
+class FT_and_BCE_loss(nn.Module):
 
     def __init__(self, bce_kwargs, soft_focal_tversky_kwargs, weight_ce=1, weight_dice=1, use_ignore_label: bool = False,
                  tversky_class=MemoryEfficientSoftFocalTverskyLoss):
@@ -120,7 +171,7 @@ class FT_and_BCE(nn.Module):
         :param bce_kwargs:
         :param aggregate:
         """
-        super(FT_and_BCE, self).__init__()
+        super(FT_and_BCE_loss, self).__init__()
         if use_ignore_label:
             bce_kwargs['reduction'] = 'none'
 
