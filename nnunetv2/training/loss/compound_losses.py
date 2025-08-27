@@ -197,14 +197,13 @@ class FT_and_BCE_loss(nn.Module):
             target_regions = target
             mask = None
 
-        tversky_loss = self.tv(net_output, target_regions, loss_mask=mask)
+        tv_loss = self.tv(net_output, target_regions, loss_mask=mask)
         target_regions = target_regions.float()
         if mask is not None:
             ce_loss = (self.ce(net_output, target_regions) * mask).sum() / torch.clip(mask.sum(), min=1e-8)
         else:
             ce_loss = self.ce(net_output, target_regions)
-
-        result = self.weight_ce * ce_loss + self.weight_tversky * tversky_loss
+        result = self.weight_ce * ce_loss + self.weight_tversky * tv_loss
         return result
 
 
